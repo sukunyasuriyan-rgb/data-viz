@@ -3,10 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบวิเคราะห์เส้นทางโลจิสติกส์ (เส้นประตามถนน)</title>
-    
+    <title>ระบบวิเคราะห์เส้นทางโลจิสติกส์ (Road Route Dash)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    
     <style>
         body { margin: 0; font-family: 'Sarabun', sans-serif; }
         #map { height: 100vh; width: 100vw; }
@@ -16,58 +14,60 @@
     </style>
 </head>
 <body>
-
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="data.js"></script>
 
     <script>
-        // 1. ตั้งค่าแผนที่เริ่มต้น
         const map = L.map('map').setView([15.0, 100.5], 6);
 
-        // 2. ใช้แผนที่ฐาน (สีเทาอ่อนเพื่อให้เส้นประสีแดงดูเด่น)
         L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
             attribution: '© OpenStreetMap contributors'
         }).addTo(map);
 
-        // 3. ฟังก์ชันดึงเส้นทางตามถนนและวาดเป็นเส้นประ
         async function getRoute(item) {
-            const url = `https://router.project-osrm.org/route/v1/driving/${item.origin.lng},${item.origin.lat};${item.destination.lng},${item.destination.lat}?overview=full&geometries=geojson`;
+            // สำคัญมาก: OSRM ต้องใช้ Longitude ขึ้นก่อน Latitude
+            const start = `${item.origin.lng},${item.origin.lat}`;
+            const end = `${item.destination.lng},${item.destination.lat}`;
+            
+            const url = `https://router.project-osrm.org/route/v1/driving/${start};${end}?overview=full&geometries=geojson`;
             
             try {
                 const response = await fetch(url);
                 const data = await response.json();
                 
-                if (data.routes && data.routes.length > 0) {
+                if (data.code === 'Ok' && data.routes.length > 0) {
+                    // แปลงพิกัดกลับเป็น [Lat, Lng] เพื่อให้ Leaflet วาดได้
                     const coordinates = data.routes[0].geometry.coordinates.map(coord => [coord[1], coord[0]]);
                     
-                    // วาดเส้นทางตามถนน "แบบเส้นประ"
                     L.polyline(coordinates, {
                         color: '#ff1744',   // สีแดงสว่าง
-                        weight: 3,          // ความหนาของเส้น
-                        opacity: 0.8,       // ความโปร่งใส
-                        dashArray: '10, 10' // ค่าที่ทำให้เป็นเส้นประ (ความยาวเส้น 10, ช่องว่าง 10)
+                        weight: 4,          // ความหนา
+                        opacity: 0.8,
+                        dashArray: '10, 10' // เส้นประ
                     }).addTo(map);
+                } else {
+                    // ถ้า API หาถนนไม่ได้ ให้วาดเส้นประตรงๆ สีส้มแทน
+                    drawFallbackLine(item);
                 }
             } catch (error) {
-                console.error('Error:', error);
-                // สำรอง: ถ้า API ล่มให้ลากเส้นประตรงๆ
-                L.polyline([[item.origin.lat, item.origin.lng], [item.destination.lat, item.destination.lng]], {
-                    color: 'red', weight: 2, dashArray: '5, 10'
-                }).addTo(map);
+                console.error('Routing Error:', error);
+                drawFallbackLine(item);
             }
         }
 
-        // 4. นำข้อมูลมาแสดงผล
+        function drawFallbackLine(item) {
+            L.polyline([[item.origin.lat, item.origin.lng], [item.destination.lat, item.destination.lng]], {
+                color: 'orange', weight: 2, dashArray: '5, 10'
+            }).addTo(map);
+        }
+
         if (typeof drugCases !== 'undefined') {
             drugCases.forEach(item => {
                 getRoute(item);
-
-                // ปักหมุดที่ปลายทาง
                 const marker = L.marker([item.destination.lat, item.destination.lng]).addTo(map);
-
-                const popupContent = `
+                marker.bindPopup(`
                     <div class="popup-content">
                         <div class="info-title">${item.logo_name}</div>
                         <div style="font-size:13px;"><b>ลักษณะ:</b> ${item.package_type}</div>
@@ -77,8 +77,7 @@
                             <b>ปลายทาง:</b> ${item.destination.name}
                         </div>
                     </div>
-                `;
-                marker.bindPopup(popupContent);
+                `);
             });
         }
     </script>
