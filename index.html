@@ -3,14 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบวิเคราะห์เส้นทางโลจิสติกส์ (Road Route Dash)</title>
+    <title>ระบบวิเคราะห์เส้นทาง (เน้นจุดต้นทาง)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; font-family: 'Sarabun', sans-serif; }
         #map { height: 100vh; width: 100vw; }
-        .popup-content { text-align: center; max-width: 200px; }
-        .popup-content img { width: 100%; height: auto; border-radius: 8px; margin-top: 10px; border: 1px solid #ddd; }
-        .info-title { font-weight: bold; color: #d32f2f; font-size: 16px; margin-bottom: 5px; }
+        .popup-content { text-align: center; max-width: 220px; }
+        .popup-content img { width: 100%; height: auto; border-radius: 8px; margin-top: 10px; border: 1px solid #ddd; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+        .info-title { font-weight: bold; color: #1b5e20; font-size: 16px; margin-bottom: 5px; border-bottom: 2px solid #4caf50; padding-bottom: 5px; }
+        .loc-tag { display: inline-block; background: #e8f5e9; color: #2e7d32; padding: 3px 10px; border-radius: 15px; font-size: 12px; margin-top: 8px; font-weight: bold; border: 1px solid #a5d6a7; }
     </style>
 </head>
 <body>
@@ -26,58 +27,66 @@
             attribution: '© OpenStreetMap contributors'
         }).addTo(map);
 
+        // ปรับขนาดไอคอนต้นทาง (สีเขียว) ให้ใหญ่ขึ้นเพื่อเน้นย้ำ
+        const originIcon = new L.Icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+            iconSize: [32, 52], // ขยายจาก [25, 41] เป็น [32, 52]
+            iconAnchor: [16, 52],
+            popupAnchor: [1, -40],
+            shadowSize: [52, 52]
+        });
+
+        // ไอคอนปลายทาง (สีแดง) ขนาดปกติ
+        const destIcon = new L.Icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+            iconSize: [20, 32], 
+            iconAnchor: [10, 32],
+            popupAnchor: [1, -30],
+            shadowSize: [32, 32]
+        });
+
         async function getRoute(item) {
-            // สำคัญมาก: OSRM ต้องใช้ Longitude ขึ้นก่อน Latitude
             const start = `${item.origin.lng},${item.origin.lat}`;
             const end = `${item.destination.lng},${item.destination.lat}`;
-            
             const url = `https://router.project-osrm.org/route/v1/driving/${start};${end}?overview=full&geometries=geojson`;
             
             try {
                 const response = await fetch(url);
                 const data = await response.json();
-                
                 if (data.code === 'Ok' && data.routes.length > 0) {
-                    // แปลงพิกัดกลับเป็น [Lat, Lng] เพื่อให้ Leaflet วาดได้
                     const coordinates = data.routes[0].geometry.coordinates.map(coord => [coord[1], coord[0]]);
-                    
-                    L.polyline(coordinates, {
-                        color: '#ff1744',   // สีแดงสว่าง
-                        weight: 4,          // ความหนา
-                        opacity: 0.8,
-                        dashArray: '10, 10' // เส้นประ
-                    }).addTo(map);
-                } else {
-                    // ถ้า API หาถนนไม่ได้ ให้วาดเส้นประตรงๆ สีส้มแทน
-                    drawFallbackLine(item);
+                    L.polyline(coordinates, { color: '#2e7d32', weight: 4, opacity: 0.6, dashArray: '10, 10' }).addTo(map);
                 }
             } catch (error) {
-                console.error('Routing Error:', error);
-                drawFallbackLine(item);
+                L.polyline([[item.origin.lat, item.origin.lng], [item.destination.lat, item.destination.lng]], { color: '#4caf50', weight: 2, dashArray: '5, 10' }).addTo(map);
             }
-        }
-
-        function drawFallbackLine(item) {
-            L.polyline([[item.origin.lat, item.origin.lng], [item.destination.lat, item.destination.lng]], {
-                color: 'orange', weight: 2, dashArray: '5, 10'
-            }).addTo(map);
         }
 
         if (typeof drugCases !== 'undefined') {
             drugCases.forEach(item => {
                 getRoute(item);
-                const marker = L.marker([item.destination.lat, item.destination.lng]).addTo(map);
-                marker.bindPopup(`
+
+                // รายละเอียด Popup ที่เน้นข้อมูลต้นทาง
+                const originPopup = `
                     <div class="popup-content">
-                        <div class="info-title">${item.logo_name}</div>
-                        <div style="font-size:13px;"><b>ลักษณะ:</b> ${item.package_type}</div>
+                        <div class="info-title">ต้นทาง: ${item.origin.name}</div>
+                        <div style="font-size:13px; margin-top:5px;"><b>ตรวจพบตรา:</b> ${item.logo_name}</div>
                         <img src="${item.img_url}" onerror="this.src='https://via.placeholder.com/150?text=No+Image'">
-                        <div style="font-size:11px; color:#666; margin-top:8px;">
-                            <b>ต้นทาง:</b> ${item.origin.name}<br>
-                            <b>ปลายทาง:</b> ${item.destination.name}
-                        </div>
+                        <div class="loc-tag">จุดหมาย: ${item.destination.name}</div>
                     </div>
-                `);
+                `;
+
+                // หมุดต้นทาง (เน้นโชว์รูปที่นี่)
+                L.marker([item.origin.lat, item.origin.lng], {icon: originIcon})
+                    .addTo(map)
+                    .bindPopup(originPopup);
+
+                // หมุดปลายทาง (โชว์ข้อมูลสั้นๆ)
+                L.marker([item.destination.lat, item.destination.lng], {icon: destIcon})
+                    .addTo(map)
+                    .bindPopup(`<b>ปลายทาง:</b> ${item.destination.name}<br>ตรา: ${item.logo_name}`);
             });
         }
     </script>
