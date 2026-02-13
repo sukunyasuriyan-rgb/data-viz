@@ -3,16 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบวิเคราะห์เส้นทางโลจิสติกส์วัตถุต้องสงสัย</title>
+    <title>ระบบวิเคราะห์เส้นทางโลจิสติกส์ตามถนนจริง</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
     <style>
-        body { margin: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
+        body { margin: 0; font-family: 'Sarabun', sans-serif; }
         #map { height: 100vh; width: 100vw; }
+        .popup-content { text-align: center; max-width: 200px; }
+        .popup-content img { width: 100%; height: auto; border-radius: 8px; margin-top: 10px; border: 1px solid #ddd; }
         .info-title { font-weight: bold; color: #d32f2f; font-size: 16px; margin-bottom: 5px; }
-        .popup-content img { width: 100%; height: auto; border-radius: 4px; margin-top: 8px; border: 1px solid #ccc; }
-        .route-info { font-size: 12px; color: #555; margin-top: 5px; }
     </style>
 </head>
 <body>
@@ -24,49 +24,63 @@
     <script src="data.js"></script>
 
     <script>
-        // 1. ตั้งค่าเริ่มต้นแผนที่ (จุดกึ่งกลางของไทย)
-        const map = L.map('map').setView([13.736, 100.523], 6);
+        // 1. ตั้งค่าแผนที่เริ่มต้น
+        const map = L.map('map').setView([15.0, 100.5], 6);
 
-        // 2. ใช้แผนที่ฐานจาก OpenStreetMap (แบบสว่างดูง่าย)
+        // 2. ใช้แผนที่ฐานจาก OpenStreetMap
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors'
         }).addTo(map);
 
-        // 3. ฟังก์ชันนำข้อมูลจาก drugCases (ใน data.js) มาแสดงผล
+        // 3. ฟังก์ชันดึงเส้นทางตามถนนจาก OSRM API
+        async function getRoute(item) {
+            const url = `https://router.project-osrm.org/route/v1/driving/${item.origin.lng},${item.origin.lat};${item.destination.lng},${item.destination.lat}?overview=full&geometries=geojson`;
+            
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data.routes && data.routes.length > 0) {
+                    const coordinates = data.routes[0].geometry.coordinates.map(coord => [coord[1], coord[0]]);
+                    
+                    // วาดเส้นทางตามถนน
+                    L.polyline(coordinates, {
+                        color: '#304ffe', // สีน้ำเงินเข้มให้ดูเป็นทางการ
+                        weight: 4,
+                        opacity: 0.7
+                    }).addTo(map);
+                }
+            } catch (error) {
+                console.error('Error fetching route:', error);
+                // หากดึงเส้นถนนไม่ได้ ให้วาดเส้นประตรงๆ แทนเป็นตัวสำรอง
+                L.polyline([[item.origin.lat, item.origin.lng], [item.destination.lat, item.destination.lng]], {
+                    color: 'red', dashArray: '5, 10'
+                }).addTo(map);
+            }
+        }
+
+        // 4. นำข้อมูลจาก drugCases มาแสดงผล
         if (typeof drugCases !== 'undefined') {
             drugCases.forEach(item => {
-                
-                // --- วาดเส้นทาง (Polyline) ---
-                const path = L.polyline([
-                    [item.origin.lat, item.origin.lng],
-                    [item.destination.lat, item.destination.lng]
-                ], {
-                    color: '#ff1744', // สีแดงสว่าง
-                    weight: 3,
-                    opacity: 0.6,
-                    dashArray: '10, 10' // เส้นประเพื่อแสดงการเคลื่อนที่
-                }).addTo(map);
+                // เรียกใช้ฟังก์ชันวาดเส้นถนน
+                getRoute(item);
 
-                // --- สร้างจุด Marker ที่ปลายทาง ---
+                // ปักหมุดที่ปลายทาง
                 const marker = L.marker([item.destination.lat, item.destination.lng]).addTo(map);
 
-                // --- เนื้อหาใน Popup ---
                 const popupContent = `
                     <div class="popup-content">
                         <div class="info-title">${item.logo_name}</div>
-                        <div><b>ลักษณะ:</b> ${item.package_type}</div>
-                        <img src="${item.img_url}" alt="หีบห่อ" onerror="this.src='https://via.placeholder.com/150?text=No+Image'">
-                        <div class="route-info">
-                            <b>ต้นทาง:</b> ${item.origin.name}<br>
-                            <b>ปลายทาง:</b> ${item.destination.name}
+                        <div style="font-size:13px;"><b>ลักษณะ:</b> ${item.package_type}</div>
+                        <img src="${item.img_url}" onerror="this.src='https://via.placeholder.com/150?text=No+Image'">
+                        <div style="font-size:11px; color:#666; margin-top:8px;">
+                            <b>จาก:</b> ${item.origin.name}<br>
+                            <b>ถึง:</b> ${item.destination.name}
                         </div>
                     </div>
                 `;
-
                 marker.bindPopup(popupContent);
             });
-        } else {
-            alert('ไม่พบข้อมูลในไฟล์ data.js กรุณาตรวจสอบชื่อตัวแปร');
         }
     </script>
 </body>
