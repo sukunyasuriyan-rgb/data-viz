@@ -22,7 +22,7 @@ const drugCases = [
         "img_url": "5_10_2025_BLUE999.jpg",
         "origin": {
             "name": "อ.สันป่าตอง จ.เชียงใหม่",
-            "lat": 118.622290514074002,
+            "lat": 18.622290514074002,
             "lng": 98.87753276704113
         },
         "destination": {
@@ -33,4 +33,5 @@ const drugCases = [
     }
 
 ];
+
 
