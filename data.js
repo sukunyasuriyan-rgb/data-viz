@@ -3,7 +3,7 @@ const drugCases = [
         "id": 1,
         "logo_name": "999 ดาว 5 ดวง (ประทับเดี่ยว) เช เกบารา สีแดง",
         "package_type": "หีบห่อกระดาษสาสีเหลืองพันเทปใส",
-        "img_url": "1_10_2025_RED999.jpg",
+        "img_url": "logo1.jpg",
         "origin": {
             "name": "จ.บึงกาฬ",
             "lat": 18.219077593014664,
@@ -31,4 +31,5 @@ const drugCases = [
             "lng": 100.6417873
         }
     }
+
 ];
