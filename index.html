@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบวิเคราะห์เส้นทางโลจิสติกส์ตามถนนจริง</title>
+    <title>ระบบวิเคราะห์เส้นทางโลจิสติกส์ (เส้นประตามถนน)</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
@@ -20,19 +20,18 @@
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
     <script src="data.js"></script>
 
     <script>
         // 1. ตั้งค่าแผนที่เริ่มต้น
         const map = L.map('map').setView([15.0, 100.5], 6);
 
-        // 2. ใช้แผนที่ฐานจาก OpenStreetMap
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        // 2. ใช้แผนที่ฐาน (สีเทาอ่อนเพื่อให้เส้นประสีแดงดูเด่น)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
             attribution: '© OpenStreetMap contributors'
         }).addTo(map);
 
-        // 3. ฟังก์ชันดึงเส้นทางตามถนนจาก OSRM API
+        // 3. ฟังก์ชันดึงเส้นทางตามถนนและวาดเป็นเส้นประ
         async function getRoute(item) {
             const url = `https://router.project-osrm.org/route/v1/driving/${item.origin.lng},${item.origin.lat};${item.destination.lng},${item.destination.lat}?overview=full&geometries=geojson`;
             
@@ -43,26 +42,26 @@
                 if (data.routes && data.routes.length > 0) {
                     const coordinates = data.routes[0].geometry.coordinates.map(coord => [coord[1], coord[0]]);
                     
-                    // วาดเส้นทางตามถนน
+                    // วาดเส้นทางตามถนน "แบบเส้นประ"
                     L.polyline(coordinates, {
-                        color: '#304ffe', // สีน้ำเงินเข้มให้ดูเป็นทางการ
-                        weight: 4,
-                        opacity: 0.7
+                        color: '#ff1744',   // สีแดงสว่าง
+                        weight: 3,          // ความหนาของเส้น
+                        opacity: 0.8,       // ความโปร่งใส
+                        dashArray: '10, 10' // ค่าที่ทำให้เป็นเส้นประ (ความยาวเส้น 10, ช่องว่าง 10)
                     }).addTo(map);
                 }
             } catch (error) {
-                console.error('Error fetching route:', error);
-                // หากดึงเส้นถนนไม่ได้ ให้วาดเส้นประตรงๆ แทนเป็นตัวสำรอง
+                console.error('Error:', error);
+                // สำรอง: ถ้า API ล่มให้ลากเส้นประตรงๆ
                 L.polyline([[item.origin.lat, item.origin.lng], [item.destination.lat, item.destination.lng]], {
-                    color: 'red', dashArray: '5, 10'
+                    color: 'red', weight: 2, dashArray: '5, 10'
                 }).addTo(map);
             }
         }
 
-        // 4. นำข้อมูลจาก drugCases มาแสดงผล
+        // 4. นำข้อมูลมาแสดงผล
         if (typeof drugCases !== 'undefined') {
             drugCases.forEach(item => {
-                // เรียกใช้ฟังก์ชันวาดเส้นถนน
                 getRoute(item);
 
                 // ปักหมุดที่ปลายทาง
@@ -74,8 +73,8 @@
                         <div style="font-size:13px;"><b>ลักษณะ:</b> ${item.package_type}</div>
                         <img src="${item.img_url}" onerror="this.src='https://via.placeholder.com/150?text=No+Image'">
                         <div style="font-size:11px; color:#666; margin-top:8px;">
-                            <b>จาก:</b> ${item.origin.name}<br>
-                            <b>ถึง:</b> ${item.destination.name}
+                            <b>ต้นทาง:</b> ${item.origin.name}<br>
+                            <b>ปลายทาง:</b> ${item.destination.name}
                         </div>
                     </div>
                 `;
